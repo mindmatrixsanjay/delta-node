@@ -2,28 +2,50 @@ const express = require("express");
 const connectDB = require("./config/database");
 const app = express();
 const User = require("./models/user");
-
+const validateSignUpData=require('./utils/validation')
 const Blog = require("./models/user");
-
+const bcrypt=require('bcrypt')
 app.use(express.json());
 
 //signup api
 app.post("/signup", async (req, res) => {
-  const data=req.body;
+  //validation of data
+   
+  //encrypt the password
   try {
-    const ALLOWED_POST=["firstName","lastName","email","gender","password","skill","age","photoUrl","about"];
-    const isPostAllowed=Object.keys(data).every(key=>{
-       return ALLOWED_POST.includes(key)
-    });
-    if(!isPostAllowed){
-      return res.status(400).send("Not allowed to post")
-    }
-    await User.create(data);
-    res.status(200).send(data);
+    validateSignUpData(req);
+    console.log("Validation passed");
+    const {firstName,lastName,email,password}=req.body;
+    const passwordHash=await bcrypt.hash(password,10)
+    const user=new User({
+      firstName,
+      lastName,
+      email,
+      password:passwordHash
+    })
+    await User.create(user);
+    res.status(200).send("saved successfully");
   } catch (err) {
-    res.status(500).send("Some error " + err.message);
+    res.status(500).send("Error: " + err.message);
   }
 });
+
+app.post('/login',async(req,res)=>{
+  try{
+   const {email,password}=req.body;
+   const user=await User.findOne({email:email})
+   if(!user){
+    return res.status(404).send("Invalid Email id")
+   }
+   const isPasswordValid=await bcrypt.compare(password,user.password);
+   if(!isPasswordValid){
+    return res.status(401).send("Wrong password")
+   }
+   res.send("User login successfull");
+  }catch(err){
+    res.status(400).send("Error message : "+err.message);
+  }
+})
 
 //get user by email
 app.get("/user", async (req, res) => {
